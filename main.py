@@ -109,6 +109,9 @@ def get_staves(staff_lines, img):
     lines = []
     staves = []
 
+    # Make sure that each staff consists of 5 lines
+    assert (len(lines) % 5 == 0)
+
     # Sort lines from top to bottom
     staff_lines.sort(key=lambda x: x[1])
 
