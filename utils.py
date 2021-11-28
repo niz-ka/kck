@@ -11,12 +11,6 @@ def save_and_show(filename, img):
     cv2.imshow(filename, img)
     cv2.waitKey(0)
 
-def straighten_helper(arr, angle):
-    data = inter.rotate(arr, angle, reshape=False, order=0)
-    hist = np.sum(data, axis=1)
-    score = np.sum((hist[1:] - hist[:-1]) ** 2)
-    return score
-
 def import_image(size):
     path = config.INPUT_DIR
     

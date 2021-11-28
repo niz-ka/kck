@@ -17,11 +17,17 @@ def binarize(img, block_size, offset, filter):
     return thresh
 
 def straighten(bin_img, delta, limit):
+    def straighten_helper(arr, angle):
+        data = inter.rotate(arr, angle, reshape=False, order=0)
+        hist = np.sum(data, axis=1, dtype=float)
+        score = np.sum((hist[1:] - hist[:-1]) ** 2, dtype=float)
+        return score
+    
     bin_img = np.invert(bin_img)
     angles = np.arange(-limit, limit+delta, delta)
     scores = []
     for angle in angles:
-        score = utils.straighten_helper(bin_img, angle)
+        score = straighten_helper(bin_img, angle)
         scores.append(score)
     best_score = max(scores)
     best_angle = angles[scores.index(best_score)]
