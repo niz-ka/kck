@@ -109,22 +109,40 @@ def get_staves(staff_lines, img):
     lines = []
     staves = []
 
-    # Make sure that each staff consists of 5 lines
-    assert (len(lines) % 5 == 0)
+    if len(staff_lines) == 0 or len(staff_lines) == 1:
+        print("No stafflines detected")
+        exit() 
 
     # Sort lines from top to bottom
     staff_lines.sort(key=lambda x: x[1])
 
+    avg_space = 0.0
+    for i in range(len(staff_lines) - 1):
+        _,y1,_,_ = staff_lines[i]
+        _,y2,_,_ = staff_lines[i+1]
+        avg_space += y2 - y1
+    avg_space /= len(staff_lines) - 1
+
     # Create Staff objects
-    for index, line in zip(range(len(staff_lines)), staff_lines):
+    staff_nr = 0
+    line_nr = 0
+    for i, line in zip(range(len(staff_lines)), staff_lines):
         x,y,w,h = line
-        lines.append(StaffLine(x, y, w, h, index%5 ,img[y:y+h, x:x+w]))
-        if((index+1) % 5 == 0):
+
+        lines.append(StaffLine(x, y, w, h, line_nr, img[y:y+h, x:x+w]))
+        line_nr += 1
+
+        if (i == len(staff_lines) - 1 or abs(lines[-1].y - staff_lines[i+1][1]) > 3*avg_space):
             staff_height = (lines[-1].y + lines[-1].height) - lines[0].y
             staff_width = max([line.width for line in lines]) 
             nparray = img[lines[0].y:lines[0].y+staff_height, lines[0].x:lines[0].x+staff_width]
-            staves.append(Staff(lines[0].x, lines[0].y, staff_width, staff_height, lines, int(index/5), nparray))
+            staves.append(Staff(lines[0].x, lines[0].y, staff_width, staff_height, lines, staff_nr, nparray))
             lines = []
+            line_nr = 0
+            staff_nr += 1
+    
+    print("Number of stafflines: ", sum([len(staff.staff_lines) for staff in staves]))
+    print("Number of staves:", len(staves))
     
     return staves
 
@@ -142,11 +160,24 @@ def get_notes(notes_rectangles, img):
     return notes
 
 def classify(staves, notes):
-    # Find proper staff for each note (check distances between center of note and center of each staff)
+    # Find proper staff for each note
+    notes_on_staff = []
+
     for note in notes:
-        distances_from_staff = [(staff.order, abs(note.y_center - staff.y_center)) for staff in staves]
-        distances_from_staff.sort(key=lambda x: x[1])
-        note.staff = distances_from_staff[0][0]
+        for staff in staves:
+            if (staff.x <= note.x_center <= staff.x + staff.width) and (staff.y <= note.y_center <= staff.y + staff.height):
+                note.staff = staff.order
+                notes_on_staff.append(note)
+                break
+    
+    if(len(notes_on_staff) == 0):
+        print("No notes on staff detected")
+        exit()
+    
+    print("Number of notes:", len(notes_on_staff))
+    print("Number of non-notes:", len(notes) - len(notes_on_staff))
+    
+    notes = notes_on_staff
 
     # Find proper note type for each note
 
@@ -198,7 +229,8 @@ def classify(staves, notes):
                 note.position = str(line_nr + 1)
             # Note is between lines
             else:
-                note.position = "{}-{}".format(line_nr+1, distances_from_line[1][0]+1)
+                if len(distances_from_line) > 1:
+                    note.position = "{}-{}".format(line_nr+1, distances_from_line[1][0]+1)
 
     # Check result
     flag_OK = True
@@ -208,6 +240,8 @@ def classify(staves, notes):
             flag_OK = False
     
     assert flag_OK
+    return notes
+    
 
 def draw_result(img, notes):
     img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
@@ -237,6 +271,6 @@ staff_lines_rectangles = find_bounding_rectangles(np.invert(horizontal_lines), m
 staves = get_staves(staff_lines_rectangles, np.invert(horizontal_lines))
 notes = get_notes(notes_rectangles, erased)
 
-classify(staves, notes)
+notes = classify(staves, notes)
 draw_result(straight, notes)
 ######
