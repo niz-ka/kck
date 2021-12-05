@@ -5,12 +5,16 @@ import logging
 _log = logging.getLogger("applogger")
 
 
-def import_image(filepath: str, size: tuple[int]):
+def import_image(filepath: str, width: int):
     img = cv.imread(filepath)
     if img is None:
         _log.critical(f"Cannot load image '{filepath}'")
         return False
-    resized = cv.resize(img, size)
+
+    aspect_ratio = img.shape[1] / img.shape[0]
+    height = int(width / aspect_ratio)
+
+    resized = cv.resize(img, (width, height))
     return cv.cvtColor(resized, cv.COLOR_BGR2RGB)
 
 

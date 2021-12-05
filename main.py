@@ -1,8 +1,23 @@
+import sys
 import cv2
 import numpy as np
 from scipy.ndimage import interpolation as inter
 import utils
+import config
 from classes import Note, Staff, StaffLine
+
+from score import filter, io, transform
+
+
+def __configure__logger__():
+    import yaml
+    from logging.config import dictConfig
+    from pathlib import Path
+
+    path = Path(__file__).parent.joinpath("logger.config.yaml").resolve()
+    with open(path) as config_file:
+        config = yaml.safe_load(config_file.read())
+        dictConfig(config)
 
 
 def convert_to_gray(img):
@@ -49,51 +64,7 @@ def detect_horizontal_lines(img):
     kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (horizontal_size, 1))
     detected_lines = cv2.morphologyEx(img, cv2.MORPH_OPEN, kernel, iterations = 1)
 
-    utils.save_and_show("horizontal.jpg", detected_lines)
     return detected_lines
-
-
-# Find vertical lines (helpful in notes repairing)
-def detect_vertical_lines(img):
-    img = np.invert(img)
-
-    vertical_size = int(img.shape[0] / 30)
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, vertical_size))
-    detected_lines = cv2.morphologyEx(img, cv2.MORPH_OPEN, kernel, iterations = 1)
-
-    utils.save_and_show("vertical.jpg", detected_lines)
-    return detected_lines
-
-
-# Remove horizontal lines and repair through vertical lines
-def remove_lines(img, horizontal_lines, vertical_lines):
-    img = cv2.bitwise_or(img, horizontal_lines)
-
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, 2))
-    img = cv2.morphologyEx(img, cv2.MORPH_CLOSE, kernel)
-
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, 3))
-    img = cv2.morphologyEx(img, cv2.MORPH_OPEN, kernel)
-
-    img = np.invert(cv2.bitwise_or(np.invert(img), vertical_lines))
-
-    utils.save_and_show("erased.jpg", img)
-    return img
-
-
-# Find rectangles of objects that have area between min_area and max_area
-def find_bounding_rectangles(img, min_area, max_area):
-    count, labels, stats = cv2.connectedComponentsWithStats(np.invert(img))[:3]
-    areas = stats[:, 4]
-
-    for label in range(1, count):
-        if areas[label] > max_area or areas[label] < min_area:
-            labels[labels == label] = 0
-    labels[labels > 0] = 255
-
-    stats = cv2.connectedComponentsWithStats(labels.astype(np.uint8))[2]
-
-    return [[x, y, w, h] for x, y, w, h, *_ in stats[1:]]
 
 
 def get_staves(staff_lines, img):
@@ -172,37 +143,6 @@ def classify(staves, notes):
     print("Number of non-notes:", len(notes) - len(notes_on_staff))
 
     notes = notes_on_staff
-
-    # Find proper note type for each note
-
-    # First note on staff is always clef
-    # for i in range(len(staves)):
-    #     # Common g-clef is always higher than staff
-    #     if (notes[i].height > staves[notes[i].staff].height):
-    #         notes[i].type = "wiolin"
-    #     else:
-    #         notes[i].type = "bas"
-
-    # # Other
-    # for note in notes:
-    #     if(note.type is not None): continue
-    #     assert staves[note.staff].order == note.staff
-
-    #     half_height = note.height // 2
-    #     half_width = note.width // 2
-
-    #     # "1" has the size of space between staff lines
-    #     if note.height < 1.5 * staves[note.staff].avg_staffline_space:
-    #         note.type = "1"
-    #     # "1/2" has many white pixels in bottom-left corner
-    #     elif np.count_nonzero(note.nparray[half_height:, :half_width]) / (half_height * half_width) > 0.8:
-    #         note.type = "1/2"
-    #     # "1/8" has many white pixels in bottom-right corner
-    #     elif np.count_nonzero(note.nparray[half_height:, half_width:]) / (half_height * half_width) > 0.8:
-    #         note.type = "1/8"
-    #     # Otherwise it's "1/4"
-    #     else:
-    #         note.type = "1/4"
 
     # Find position on staff
     for note in notes:
@@ -283,26 +223,62 @@ def __draw_note_parts__(img, notes: list[Note]):
             stem_y = note.y + note.stem.y
             cv2.rectangle(img, (stem_x, stem_y, note.stem.width, note.stem.height), (255, 0, 0), 1)
 
-    utils.save_and_show("parts.jpg", img)
+    io.show_image('Detected notes parts', img)
+
+
+def __draw_rectangles__(title, img, rects, thickness = 1):
+    img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
+
+    for x, y, w, h in rects:
+        cv2.rectangle(img, (x, y, w, h), (144, 169, 85), thickness)
+
+    io.show_image(title, img)
 
 
 ######
-img = utils.import_image(size = (1200, 500))
-gray = convert_to_gray(img)
-binary = binarize(gray, block_size = 51, offset = 10, filter = (9, 75, 75))
-straight = straighten(binary, delta = 1, limit = 50)
+__configure__logger__()
 
-horizontal_lines = detect_horizontal_lines(straight)
-vertical_lines = detect_vertical_lines(straight)
-erased = remove_lines(straight, horizontal_lines, vertical_lines)
+filename = sys.argv[1]
 
-notes_rectangles = find_bounding_rectangles(erased, min_area = 150, max_area = 5000)
-staff_lines_rectangles = find_bounding_rectangles(np.invert(horizontal_lines), min_area = 500, max_area = 400000)
+img = io.import_image('img/' + filename, 1200)
+if img is False:
+    exit(-1)
+
+gray = filter.desaturate(img)
+io.save_image(config.OUTPUT_DIR + filename + '_1_desaturated.png', gray)
+io.show_image(filename + ' | Desaturated', gray)
+
+binary = filter.binarize(gray)
+io.save_image(config.OUTPUT_DIR + filename + '_2_binarized.png', binary)
+io.show_image(filename + ' | Binarized', binary)
+
+rotation_angle = transform.detect_rotation_angle(binary)
+straight = transform.rotate(binary, rotation_angle)
+io.save_image(config.OUTPUT_DIR + filename + '_3_straightened.png', straight)
+io.show_image(filename + ' | Straightened', straight)
+
+horizontal_lines = filter.detect_horizontal_lines(straight)
+io.save_image(config.OUTPUT_DIR + filename + '_4_horizontal_lines.png', horizontal_lines)
+io.show_image(filename + ' | Horizontal Lines', horizontal_lines)
+
+vertical_lines = filter.detect_vertical_lines(straight)
+io.save_image(config.OUTPUT_DIR + filename + '_5_vertical_lines.png', vertical_lines)
+io.show_image(filename + ' | Vertical Lines', vertical_lines)
+
+erased = filter.remove_lines(straight, horizontal_lines, vertical_lines)
+io.save_image(config.OUTPUT_DIR + filename + '_6_erased.png', erased)
+io.show_image(filename + ' | Erased', erased)
+
+notes_rectangles = filter.find_bounding_rectangles(erased, min_area = 150, max_area = 5000)
+__draw_rectangles__('Detected objects 2', straight, notes_rectangles)
+
+staff_lines_rectangles = filter.find_bounding_rectangles(np.invert(horizontal_lines), min_area = 500, max_area = 400000)
+__draw_rectangles__('Detected staff lines 2', straight, staff_lines_rectangles, -1)
 
 staves = get_staves(staff_lines_rectangles, np.invert(horizontal_lines))
 notes = get_notes(notes_rectangles, erased)
 
 notes = classify(staves, notes)
 draw_result(straight, notes)
-# __draw_note_parts__(straight, notes)
+__draw_note_parts__(straight, notes)
 ######
