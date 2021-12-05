@@ -1,0 +1,22 @@
+version: 1
+formatters:
+  logformatter:
+    format: '[%(levelname)s][%(asctime)s](%(name)s) - %(message)s'
+handlers:
+  console:
+    class: logging.StreamHandler
+    level: DEBUG
+    formatter: logformatter
+    stream: ext://sys.stdout
+  file:
+    class : logging.FileHandler
+    formatter: logformatter
+    filename: app.log
+loggers:
+  applogger:
+    level: DEBUG
+    handlers: [console, file]
+    propagate: no
+root:
+  level: DEBUG
+  handlers: [console]
