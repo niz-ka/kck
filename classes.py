@@ -137,8 +137,10 @@ class Note:
             upper_offset = rows[0][0]
             lower_offset = rows[-1][0]
 
-            diff = max(rows, key = lambda x: x[1])[1] - min(rows, key = lambda x: x[1])[1]
-            if diff > HORIZONTAL_THRESHOLD:
+            max_stem_girth = max(rows, key = lambda x: x[1])[1]
+            min_stem_girth = min(rows, key = lambda x: x[1])[1]
+            diff = max_stem_girth - min_stem_girth
+            if diff > 2 * min_stem_girth:
                 type = 'quaver'
             else:
                 type = 'whole'
@@ -146,12 +148,12 @@ class Note:
             stem_width = right_offset - left_offset
             stem_height = lower_offset - upper_offset
 
-            if stem_width / stem_height > 0.9:
+            if stem_height != 0 and stem_width / stem_height > 0.9:
                 # If aspect ratio is not portrait-like then it's probably a semibreve.
                 return None
 
             if stem_width > 0.7 * width:
-                # If "stem" width take over 80% of note's width then it's probably a semibreve.
+                # If "stem" width take over 70% of note's width then it's probably a semibreve.
                 return None
 
             # if np.sum(img[upper_offset:lower_offset, left_offset:right_offset]) < 0.5 * width * height:
@@ -198,7 +200,6 @@ class Note:
 
             return Note.Head(left_offset, upper_offset, width, height, type)
 
-        src = np.invert(img)
         height, width, *_ = img.shape
         img = np.invert(img) / 255.
 

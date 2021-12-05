@@ -2,6 +2,8 @@ import cv2 as cv
 import numpy as np
 import logging
 
+from score.classes import HorizontalLine
+
 _log = logging.getLogger('applogger')
 
 
@@ -30,6 +32,45 @@ def binarize(img, block_size = 51, offset = 10, filter = (9, 75, 75)):
     return cv.bilateralFilter(thresh, *filter)
 
 
+def get_staves(staff_lines, img):
+    from pipe import where, select
+    from score.classes import Staff
+    import itertools
+    import more_itertools as iter
+
+    def find_approx_staff_height(lines):
+        if len(lines) < 2:
+            _log.error("Cannot infer staff height from less than 2 lines.")
+            return False
+
+        gradient = [lines[i].y - lines[i - 1].y for i in range(1, len(lines))]
+        threshold = 2 * np.median(gradient) + np.std(gradient)
+        spaces = list(enumerate(gradient) | where(lambda val: val[1] > threshold) | select(lambda val: val[0]))
+        indices = sorted(list(itertools.chain(*[[i, i + 1] for i in spaces])) + [0, len(lines) - 1])
+        heights = [lines[j].y - lines[i].y for i, j in iter.grouper(indices, 2, indices[-1])]
+
+        return np.median(heights), indices
+
+    # Sort lines from top to bottom
+    staff_lines.sort(key = lambda x: x[1])
+
+    # Find left bounding of all staves.
+    min_x = min(staff_lines[:][0])
+    # Find right bounding of all staves.
+    max_x = max([x + w for x, _, w, _ in staff_lines])
+
+    lines = [HorizontalLine(min_x, max_x, y + h // 2) for _, y, _, h in staff_lines]
+
+    _log.debug("Found probable staff lines:")
+    for line in lines:
+        _log.debug(f"{line}")
+
+    height, indices = find_approx_staff_height(lines)
+    _log.debug(f"Found staff height: {height}")
+
+    return [Staff(min_x, max_x, lines[index].y, height, i) for i, index in enumerate(indices[::2])]
+
+
 def find_staff_bounds(img):
     from pipe import where, select
     from score.classes import HoughLine, Staff
@@ -55,6 +96,10 @@ def find_staff_bounds(img):
     lines = list(
         sorted([HoughLine(line[0][0], line[0][1]) for line in lines], key = lambda line: line.y)
         | where(lambda line: abs(line.angle - PI_HALF) < 0.0001))
+
+    _log.debug("Found probable staff lines:")
+    for line in lines:
+        _log.debug(f"{line}")
 
     height, indices = find_approx_staff_height(lines)
     _log.debug(f"Found staff height: {height}")
