@@ -1,7 +1,6 @@
 import sys
 import cv2
 import numpy as np
-from scipy.ndimage import interpolation as inter
 import utils
 import config
 from classes import Note, Staff, StaffLine
@@ -18,53 +17,6 @@ def __configure__logger__():
     with open(path) as config_file:
         config = yaml.safe_load(config_file.read())
         dictConfig(config)
-
-
-def convert_to_gray(img):
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    gray = cv2.fastNlMeansDenoising(gray, None)
-    utils.save_and_show("gray.jpg", gray)
-    return gray
-
-
-def binarize(img, block_size, offset, filter):
-    thresh = cv2.adaptiveThreshold(img, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, block_size, offset)
-    thresh = cv2.bilateralFilter(thresh, *filter)
-    utils.save_and_show("thresh.jpg", thresh)
-    return thresh
-
-
-def straighten(bin_img, delta, limit):
-    def straighten_helper(arr, angle):
-        data = inter.rotate(arr, angle, reshape = False, order = 0)
-        hist = np.sum(data, axis = 1, dtype = float)
-        score = np.sum((hist[1:] - hist[:-1])**2, dtype = float)
-        return score
-
-    bin_img = np.invert(bin_img)
-    angles = np.arange(-limit, limit + delta, delta)
-    scores = []
-    for angle in angles:
-        score = straighten_helper(bin_img, angle)
-        scores.append(score)
-    best_score = max(scores)
-    best_angle = angles[scores.index(best_score)]
-    print('Best angle:', best_angle)
-    data = inter.rotate(bin_img, best_angle, reshape = False, order = 0)
-    img = np.invert(np.array(data).astype(np.uint8))
-
-    return img
-
-
-# Find horizontal lines (staff lines)
-def detect_horizontal_lines(img):
-    img = np.invert(img)
-
-    horizontal_size = int(img.shape[1] / 30)
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (horizontal_size, 1))
-    detected_lines = cv2.morphologyEx(img, cv2.MORPH_OPEN, kernel, iterations = 1)
-
-    return detected_lines
 
 
 def get_staves(staff_lines, img):
@@ -233,6 +185,7 @@ def __draw_rectangles__(title, img, rects, thickness = 1):
         cv2.rectangle(img, (x, y, w, h), (144, 169, 85), thickness)
 
     io.show_image(title, img)
+    return img
 
 
 ######
@@ -270,10 +223,12 @@ io.save_image(config.OUTPUT_DIR + filename + '_6_erased.png', erased)
 io.show_image(filename + ' | Erased', erased)
 
 notes_rectangles = filter.find_bounding_rectangles(erased, min_area = 150, max_area = 5000)
-__draw_rectangles__('Detected objects 2', straight, notes_rectangles)
+detected_objects = __draw_rectangles__('Detected objects', straight, notes_rectangles)
+io.save_image('detected_objects.png', detected_objects)
 
 staff_lines_rectangles = filter.find_bounding_rectangles(np.invert(horizontal_lines), min_area = 500, max_area = 400000)
-__draw_rectangles__('Detected staff lines 2', straight, staff_lines_rectangles, -1)
+detected_stafflines = __draw_rectangles__('Detected staff lines', straight, staff_lines_rectangles, -1)
+io.save_image('detected_stafflines.png', detected_stafflines)
 
 staves = get_staves(staff_lines_rectangles, np.invert(horizontal_lines))
 notes = get_notes(notes_rectangles, erased)
