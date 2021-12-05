@@ -246,7 +246,18 @@ def draw_result(img, notes):
         text_label = f"{index}"
         # if note.type == '@':
         #     continue
-        cv2.rectangle(img, (note.x, note.y), (note.x + note.width, note.y + note.height), (0, 255, 0), 2)
+        if note.type == '1':
+            color = (224, 217, 174)
+        elif note.type == '1/2':
+            color = (195, 160, 159)
+        elif note.type == '1/4':
+            color = (0, 86, 148)
+        elif note.type == '1/8':
+            color = (29, 176, 114)
+        else:
+            color = (29, 4, 106)
+
+        cv2.rectangle(img, (note.x, note.y), (note.x + note.width, note.y + note.height), color, 2)
         cv2.putText(img,
                     text_label, (note.x, note.y),
                     cv2.FONT_HERSHEY_COMPLEX,

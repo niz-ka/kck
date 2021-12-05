@@ -143,14 +143,22 @@ class Note:
             else:
                 type = 'whole'
 
-            width = right_offset - left_offset
-            height = lower_offset - upper_offset
+            stem_width = right_offset - left_offset
+            stem_height = lower_offset - upper_offset
 
-            if width / height > 0.9:
+            if stem_width / stem_height > 0.9:
                 # If aspect ratio is not portrait-like then it's probably a semibreve.
                 return None
 
-            return Note.Stem(left_offset, upper_offset, width, height, type)
+            if stem_width > 0.7 * width:
+                # If "stem" width take over 80% of note's width then it's probably a semibreve.
+                return None
+
+            # if np.sum(img[upper_offset:lower_offset, left_offset:right_offset]) < 0.5 * width * height:
+            #     # If stem filling is less than 50% it's probably a semibreve.
+            #     return None
+
+            return Note.Stem(left_offset, upper_offset, stem_width, stem_height, type)
 
         def detect_head(img, width, height):
             img = img[:height, :width]
