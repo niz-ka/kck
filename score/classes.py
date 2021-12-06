@@ -159,7 +159,7 @@ class Note:
 
             left_offset = possible_stem[0][0]
             # We need to remove head's part after detecting left offset.
-            columns = list(filter(lambda x: x[0] > left_offset, columns))
+            columns = list(filter(lambda x: x[0] >= left_offset, columns))
 
             # Right offset will be the last element that exceeds THRESHOLD.
             # Because STEM_THRESHOLD gives a lot higher requirements so this definitely exists.
