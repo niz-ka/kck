@@ -3,3 +3,4 @@ preprocess/
 out/
 __pycache__
 .vscode/
+*.log
