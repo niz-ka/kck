@@ -19,48 +19,6 @@ def __configure__logger__():
         dictConfig(config)
 
 
-# def get_staves(staff_lines, img):
-#     lines = []
-#     staves = []
-
-#     if len(staff_lines) < 2:
-#         print("No stafflines detected")
-#         exit()
-
-#     # Sort lines from top to bottom
-#     staff_lines.sort(key = lambda x: x[1])
-
-#     avg_space = 0.0
-#     for i in range(len(staff_lines) - 1):
-#         _, y1, _, _ = staff_lines[i][1]
-#         _, y2, _, _ = staff_lines[i + 1][1]
-#         avg_space += y2 - y1
-#     avg_space /= len(staff_lines) - 1
-
-#     # Create Staff objects
-#     staff_nr = 0
-#     line_nr = 0
-#     for i, line in zip(range(len(staff_lines)), staff_lines):
-#         x, y, w, h = line
-
-#         lines.append(StaffLine(x, y, w, h, line_nr, img[y:y + h, x:x + w]))
-#         line_nr += 1
-
-#         if i == len(staff_lines) - 1 or abs(lines[-1].y - staff_lines[i + 1][1]) > 3 * avg_space:
-#             staff_height = (lines[-1].y + lines[-1].height) - lines[0].y
-#             staff_width = max([line.width for line in lines])
-#             nparray = img[lines[0].y:lines[0].y + staff_height, lines[0].x:lines[0].x + staff_width]
-#             staves.append(Staff(lines[0].x, lines[0].y, staff_width, staff_height, lines, staff_nr, nparray))
-#             lines = []
-#             line_nr = 0
-#             staff_nr += 1
-
-#     print("Number of stafflines: ", sum([len(staff.staff_lines) for staff in staves]))
-#     print("Number of staves:", len(staves))
-
-#     return staves
-
-
 def get_notes(notes_rectangles, img):
     notes = []
 
@@ -147,6 +105,7 @@ def draw_result(img, notes):
 
     return img
 
+
 def __draw_note_parts__(img, notes: list[Note]):
     img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
 
@@ -161,6 +120,7 @@ def __draw_note_parts__(img, notes: list[Note]):
             cv2.rectangle(img, (stem_x, stem_y, note.stem.width, note.stem.height), (255, 0, 0), 1)
 
     io.show_image('Detected notes parts', img)
+    return img
 
 
 def __draw_rectangles__(title, img, rects, thickness = 1):
@@ -220,7 +180,8 @@ io.save_image(config.OUTPUT_DIR + filename + '_8_detected_stafflines.png', detec
 
 staves = filters.get_staves(staff_lines_rectangles, np.invert(horizontal_lines))
 staves_rects = [(staff.x_start, int(staff.y), staff.x_end - staff.x_start, int(staff.height)) for staff in staves]
-__draw_rectangles__('Detected staves', straight, staves_rects, -1)
+staves_rects = __draw_rectangles__('Detected staves', straight, staves_rects, -1)
+io.save_image(config.OUTPUT_DIR + filename + '_9_staves.png', staves_rects)
 
 notes = get_notes(notes_rectangles, erased)
 
@@ -228,5 +189,6 @@ notes = classify(staves, notes)
 final = draw_result(straight, notes)
 io.save_image(config.OUTPUT_DIR + filename + '_9_final.png', final)
 io.show_image(filename + ' | Final', final)
-__draw_note_parts__(straight, notes)
+heads = __draw_note_parts__(straight, notes)
+io.save_image(config.OUTPUT_DIR + filename + '_10_heads.png', heads)
 ######
