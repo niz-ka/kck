@@ -1,0 +1,20 @@
+kimg1 (z pustą pięciolinią)
+- wykryte: 10/11 = 90.9%
+- rodzaj: 10/10 = 100%
+
+kimg2 (z pustą pięciolinią, skosem, stołem)
+- wykryte: 10/11 = 90.9%
+- rodzaj: 10/10 = 100%
+
+kimg3 (flash)
+- wykryte: 9/11 = 81.8%
+- rodzaj: 9/9 = 100%
+
+kimg4 (dwie pięciolinie)
+- wykryte: 20/22 = 90.9%
+- rodzaj: 18/20 = 90%
+
+kimg5 (dlugopis)
+- wykryte: 22/22 = 100%
+- rodzaj: 21/22 = 95.5%
+
